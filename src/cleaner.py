@@ -9,10 +9,11 @@ def clean_csv(csv_file ):
         df[column_name] = df[column_name].astype(str).str.strip()
         df[column_name] = df[column_name].astype(str).str.capitalize()
 
-        output_file = "data/Trip_data_cleaned.csv"
+        output_file = "data/Trip_Causes_Cleaned.csv"
         df.to_csv(output_file, index = False)
 
         print(f"The cleaned data has been saved to {output_file} ")
+        return output_file
 
 
     except FileNotFoundError:
