@@ -88,7 +88,7 @@ def insert_column_to_excel(csv_file_path, excel_file):
         # Save the modified workbook
         workbook.save(excel_file)
 
-        Print(f"Successfully inseted clean Causes into {excel_file}")
+        print(f"Successfully inseted clean Causes into {excel_file}")
 
     except FileNotFoundError:
         print(f"Error: the excel file {excel_file} was not found")
