@@ -1,7 +1,7 @@
 import pandas as pd
 from excel import extract_column_to_csv, insert_column_to_excel
 from cleaner import clean_csv
-from translator import back_translator
+#from translator import back_translator
 
 
 excel_file = "data/Trip Data for Matthew.xlsx"

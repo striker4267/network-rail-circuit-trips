@@ -18,40 +18,47 @@ def extract_column_to_csv(excel_file, sheet_name, column_names):
 
         # Determine the output CSV filename based on column name
         if column_name == "Cause":
-            output_csv_file = "Trip_Causes_Uncleaned.csv"
+            output_csv_file = ["Trip_Causes_Uncleaned.csv", "Cause_types.csv"]
         else:
             output_csv_file = f"{column_name}_data.csv"
         
         # Create full path for the output CSV file
-        output_csv_file_path = os.path.join( subfolder_name, output_csv_file)
+        if not isinstance(output_csv_file, list):
+            output_csv_file = [output_csv_file]
 
-        try:
-            # Read the specified Excel sheet into a DataFrame
-            df = pd.read_excel(excel_file, sheet_name=sheet_name)
-            
-            # Check if the target column exists in the DataFrame
-            if column_name not in df.columns:
-                print(f"Error: Column {column_name} not found in {excel_file}")
-                print(f" Available columns are { df.columns.tolist()}")
-                return # Exit function if column not found
+        for file in output_csv_file:
+            output_csv_file_path = os.path.join( subfolder_name, file)
 
-            # Clean newline characters from the selected column
-            # Replaces one or more newline/carriage return characters with a single space
-            df[column_name] = df[column_name].astype(str).str.replace(r"[\n\r]+", ' ', regex = True)
-            
-            # Select the column to save
-            selected_column = df[column_name]
-            
-            # Save the selected column to CSV
-            # index=False prevents writing DataFrame index, header=True includes column name
-            selected_column.to_csv(output_csv_file_path, index = False, header=True)
+            try:
+                # Read the specified Excel sheet into a DataFrame
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                
+                # Check if the target column exists in the DataFrame
+                if column_name not in df.columns:
+                    print(f"Error: Column {column_name} not found in {excel_file}")
+                    print(f" Available columns are { df.columns.tolist()}")
+                    return # Exit function if column not found
 
-            print(f" Successfully extraced column '{column_name}' from '{excel_file}' \n and saved it to '{output_csv_file}.csv'") 
+                # Clean newline characters from the selected column
+                # Replaces one or more newline/carriage return characters with a single space
+                df[column_name] = df[column_name].astype(str).str.replace(r"[\n\r]+", ' ', regex = True)
+                
+                # Select the column to save
+                selected_column = df[column_name]
+                if file == "Cause_types.csv":
+                    selected_column = selected_column.value_counts().reset_index()
+                    #selected_column = selected_column.drop_duplicates()
+                
+                # Save the selected column to CSV
+                # index=False prevents writing DataFrame index, header=True includes column name
+                selected_column.to_csv(output_csv_file_path, index = False, header=True)
 
-        except FileNotFoundError:
-            print(f"Error Excel file not found at '{excel_file}")
-        except Exception as e:
-            print(f"An error occurred: {e}")
+                print(f" Successfully extraced column '{column_name}' from '{excel_file}' \n and saved it to '{file}'") 
+
+            except FileNotFoundError:
+                print(f"Error Excel file not found at '{excel_file}")
+            except Exception as e:
+                print(f"An error occurred: {e}")
 
 def insert_column_to_excel(csv_file_path, excel_file, rows_to_drop):
     """
@@ -71,8 +78,6 @@ def insert_column_to_excel(csv_file_path, excel_file, rows_to_drop):
         for row_num in sorted(rows_to_drop, reverse=True):
             sheet.delete_rows(row_num + 2)
 
-
-        print("Delete rows from excel complete")
         # Find the column number of "Cause" header
         header_row_num = 1 # Assuming headers are in the first row
         target_column = -1 # Initialize with a value indicating not found
@@ -80,7 +85,6 @@ def insert_column_to_excel(csv_file_path, excel_file, rows_to_drop):
             if cell.value == "Cause":
                 target_column = col_idx + 1 # Excel columns are 1-indexed
                 break
-        print("1")
             
         # Read the cleaned CSV file
         # header=None means no header row in CSV
@@ -94,7 +98,6 @@ def insert_column_to_excel(csv_file_path, excel_file, rows_to_drop):
             target_row = i + header_row_num + 1 # Calculate the target row number
             sheet.cell(column=target_column, row=target_row, value=cleaned_value)
 
-        print("2")
         # Save the modified workbook
         workbook.save(excel_file)
 
