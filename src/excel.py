@@ -15,6 +15,10 @@ def extract_column_to_csv(excel_file, sheet_name, column_names):
         # Create 'data' subfolder if it doesn't exist
         if not os.path.exists(subfolder_name):
             os.makedirs(subfolder_name)
+        if not os.path.isfile(os.path.join(subfolder_name, "combined_data.csv")):
+            combined_file_path = os.path.join(subfolder_name, "combined_data.csv")
+            with open(combined_file_path, 'w') as f:
+                pass
 
         # Determine the output CSV filename based on column name
         if column_name == "Cause":
