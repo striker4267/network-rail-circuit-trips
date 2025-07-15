@@ -32,12 +32,12 @@ def translate(cause_csv, action_csv, cause_types_csv, combined_csv):
     It manages execution flags, loads data, augments, and saves results.
     """
     # Check if the process has already fully completed in a previous run
-    if not os.path.exists("back_translation_has_run.flag"):
+    if not os.path.exists("data/back_translation_has_run.flag"):
         print("Running back-translation process...")
 
-        # Create a temporary flag file if it doesn't exist to track progress
-        if not os.path.exists("back_translation_temp.flag"):
-            with open("back_translation_temp.flag", "w") as f:
+        # Create a temporary flag file if it does not exist to track progress
+        if not os.path.exists("data/back_translation_temp.flag"):
+            with open("data/back_translation_temp.flag", "w") as f:
                 f.write("0") # Initialize progress to 0 (meaning no categories processed yet)
 
     else:
@@ -56,11 +56,13 @@ def translate(cause_csv, action_csv, cause_types_csv, combined_csv):
     
     # Iterate through each cause (category) and its frequency from the cause_types_csv
     for cause, frequency in df_ct.itertuples(index=False):
+        print(f"\n--- Processing Category: '{cause}' (Original Frequency: {frequency}) ---")
 
         # Read progress from the temporary flag file
         # If the current category's count is <= the saved progress, skip it (already processed)
         with open("back_translation_temp.flag", 'r') as f:
             if int(f.read()) >= count:
+                print(f"Skipping '{cause}', already processed in a previous run.")
                 count +=1 # Increment counter for the next potential processing
                 continue # Skip to the next cause
 
@@ -73,19 +75,26 @@ def translate(cause_csv, action_csv, cause_types_csv, combined_csv):
             else:
                 factor = math.ceil(800/ frequency)
             
+            print(f"  Strategy: Moderate Augmentation (Target Factor: {factor})")
+
             # Get original sentences for the current cause
             # Assumes 'Cause' column in df_c aligns with 'Action' in df_a by index
             indexes = df_c.index[df_c['Cause'] == cause].tolist()
             sentences = df_a.loc[indexes, 'Action'].tolist()
             if len(sentences) == 0:
+                print(f"  Warning: No original sentences found for cause: '{cause}'. Skipping augmentation.")
+                count += 1
                 continue # Skip if no sentences found for this cause
+            
+            print(f"  Original sentences count: {len(sentences)}")
 
             mod_sentences = sentences.copy() # Start with original sentences
 
             # Augment by repeatedly translating the original sentences
             # This loop will run (factor - 1) times, adding (factor - 1) copies of translated originals
             # Total sentences will be original_count + (original_count * (factor - 1)) = original_count * factor
-            for _ in range(factor - 1):
+            for i in range(factor - 1):
+                print(f"  Augmenting originals - round {i+1}/{factor-1} (current total: {len(mod_sentences)})")
                 mod_sentences.extend(batch_translator(sentences))
             
             # Note: This strategy prioritizes original data quality over maximum diversity
@@ -105,55 +114,65 @@ def translate(cause_csv, action_csv, cause_types_csv, combined_csv):
             else:
                 max = 3
                 factor = math.ceil( (300/ frequency)/max)
+            
+            print(f"  Strategy: Aggressive Augmentation (Diversity Rounds: {max}, Total Factor: {factor})")
 
-        # So we need: (target_multiplier / (1 + max)) - 1 rounds of translating augmented
-        phase1_multiplier = 1 + max
-        if factor <= phase1_multiplier:
-            # We already have enough after phase 1
-            phase2_rounds = 0
+            # Get original sentences for the current cause
+            # Assumes 'Cause' column in df_c aligns with 'Action' in df_a by index
+            indexes = df_c.index[df_c['Cause'] == cause].tolist()
+            sentences = df_a.loc[indexes, 'Action'].tolist()
+            if len(sentences) == 0:
+                print(f"  Warning: No original sentences found for cause: '{cause}'. Skipping augmentation.")
+                count += 1
+                continue # Skip if no sentences found for this cause
+            
+            print(f"  Original sentences count: {len(sentences)}")
+
+
+            augmented = sentences.copy() # Start with original sentences for initial augmentation
+
+            # First phase: Build diversity by translating ORIGINAL sentences multiple times
+            # This creates: original + (max rounds of back-translated originals)
+            for round_num in range(max):
+                print(f"  Phase 1 (Diversity): '{cause}' - round {round_num+1}/{max} (current total: {len(augmented)})")
+                augmented.extend(batch_translator(sentences))  # Always translate originals
+
+            print(f"  After Phase 1 (Diversity Building): {len(sentences)} originals -> {len(augmented)} sentences")
+
+            mod_sentences = augmented.copy() # Start 'mod_sentences' with the diverse 'augmented' set
+            
+            # Second phase: Scale up by back-translating the entire augmented set
+            # This loop runs (factor - max) times, from 'max' up to 'factor' (exclusive)
+            for round_num in range(max, factor): 
+                print(f"  Phase 2 (Scaling): '{cause}' - round {round_num+1-max}/{factor-max} (current total: {len(mod_sentences)})")
+                mod_sentences.extend(batch_translator(augmented))
         else:
-            # Calculate how many times we need to multiply the augmented set
-            phase2_multiplier = math.ceil(factor / phase1_multiplier)
-            phase2_rounds = phase2_multiplier - 1
+            print(f"  Strategy: No Augmentation (Frequency {frequency} is >= 400)")
+            # Get original sentences for the current cause
+            indexes = df_c.index[df_c['Cause'] == cause].tolist()
+            sentences = df_a.loc[indexes, 'Action'].tolist()
+            # No augmentation, so mod_sentences is just a copy of the originals
+            mod_sentences = sentences.copy()
+            if len(sentences) == 0:
+                print(f"  Warning: No original sentences found for cause: '{cause}'. Skipping.")
+                count += 1
+                continue
 
-        # Get original sentences for the current cause
-        indexes = df_c.index[df_c['Cause'] == cause].tolist()
-        sentences = df_a.loc[indexes, 'Action'].tolist()
-        if len(sentences) == 0:
-            print(f"No sentences found for cause: {cause}")
-            count += 1
-            continue # Skip if no sentences found for this cause
-
-        augmented = sentences.copy() # Start with original sentences for initial augmentation
-
-        # First phase: Build diversity by translating ORIGINAL sentences multiple times
-        # This creates: original + (max rounds of back-translated originals)
-        for round_num in range(max):
-            print(f"Building diversity for '{cause}' - round {round_num+1}/{max}")
-            augmented.extend(batch_translator(sentences))  # Always translate originals
-
-        print(f"After phase 1: {len(sentences)} -> {len(augmented)} sentences")
-
-        mod_sentences = augmented.copy() # Start 'mod_sentences' with the diverse 'augmented' set
-        
-        # Second phase: Scale up by back-translating the entire augmented set
-        for round_num in range(phase2_rounds):
-            print(f"Scaling up '{cause}' - round {round_num+1}/{phase2_rounds}")
-            mod_sentences.extend(batch_translator(augmented))
-        
-        print(f"Final augmented '{cause}': {len(sentences)} -> {len(mod_sentences)} sentences")
+        print(f"Final augmented count for '{cause}': {len(sentences)} originals -> {len(mod_sentences)} total sentences.")
         # Append the (original + augmented) sentences for the current cause to the combined CSV
         # Data is saved per category for robust recovery in case of interruption.
         append_sentences_to_csv(mod_sentences, cause, combined_csv )
+        print(f"Appended '{cause}' data to '{combined_csv}'.")
 
         # Update the temporary flag with the count of the just-processed category
-        with open("back_translation_temp.flag", "w") as f:
+        with open("data/back_translation_temp.flag", "w") as f:
             f.write(str(count))
         count +=1 # Increment counter for the next category
 
 
     # Rename the temporary flag to indicate full completion of the entire process
-    os.rename("back_translation_temp.flag", "back_translation_has_run.flag")
+    os.rename("data/back_translation_temp.flag", "data/back_translation_has_run.flag")
+    print("\nBack-translation process completed successfully!")
 
 
 def batch_translator(texts, batch_size = 16):
@@ -165,6 +184,7 @@ def batch_translator(texts, batch_size = 16):
     # Process texts in batches for efficiency
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i+batch_size]
+        # print(f"  Translating batch {i//batch_size + 1} of {math.ceil(len(texts)/batch_size)}") # Optional: very verbose
 
         # Translate batch from English to French
         fr_results = translator_en_fr(batch)

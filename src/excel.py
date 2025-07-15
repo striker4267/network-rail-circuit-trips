@@ -111,3 +111,15 @@ def insert_column_to_excel(csv_file_path, excel_file, rows_to_drop):
         print(f"Error: the excel file {excel_file} was not found")
     except Exception as e:
         print(f"Error: {e}")
+
+def insert_combined_to_excel(csv_file_path, excel_file, sheet_name = "Augmented Data"):
+    try:
+
+        df = pd.read_csv(csv_file_path)
+
+        with pd.ExcelWriter(excel_file, engine= 'openpyxl', mode= 'a', if_sheet_exists= 'new') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index = False)
+    except FileNotFoundError:
+        print(f"Error: the excel file {excel_file} was not found")
+    except Exception as e:
+        print(f"Error: {e}")
