@@ -53,7 +53,7 @@ def extract_column_to_csv(excel_file, sheet_name, column_names):
         except Exception as e:
             print(f"An error occurred: {e}")
 
-def insert_column_to_excel(csv_file_path, excel_file):
+def insert_column_to_excel(csv_file_path, excel_file, rows_to_drop):
     """
     Reads a CSV file and inserts its content into the 'Cause' column of an Excel file.
     Assumes 'Cause' column exists and is in "Sheet1".
@@ -65,6 +65,14 @@ def insert_column_to_excel(csv_file_path, excel_file):
         # Select the specific sheet by name
         sheet = workbook["Sheet1"] # Assuming the target sheet is always "Sheet1"
 
+        # Delete rows (with NaN in actions and not "No fault found" in causes) from Excel.
+        # Add 2 to match Excel's 1-based indexing and skip the header row.
+        # Reverse the list to avoid shifting row positions while deleting.
+        for row_num in sorted(rows_to_drop, reverse=True):
+            sheet.delete_rows(row_num + 2)
+
+
+        print("Delete rows from excel complete")
         # Find the column number of "Cause" header
         header_row_num = 1 # Assuming headers are in the first row
         target_column = -1 # Initialize with a value indicating not found
@@ -72,6 +80,7 @@ def insert_column_to_excel(csv_file_path, excel_file):
             if cell.value == "Cause":
                 target_column = col_idx + 1 # Excel columns are 1-indexed
                 break
+        print("1")
             
         # Read the cleaned CSV file
         # header=None means no header row in CSV
@@ -85,6 +94,7 @@ def insert_column_to_excel(csv_file_path, excel_file):
             target_row = i + header_row_num + 1 # Calculate the target row number
             sheet.cell(column=target_column, row=target_row, value=cleaned_value)
 
+        print("2")
         # Save the modified workbook
         workbook.save(excel_file)
 
@@ -94,9 +104,3 @@ def insert_column_to_excel(csv_file_path, excel_file):
         print(f"Error: the excel file {excel_file} was not found")
     except Exception as e:
         print(f"Error: {e}")
-
-    # This is a duplicate try/except block, not part of the standard flow
-    except FileNotFoundError:
-        print(f"Error: the excel file {excel_file} was not found")
-    except Exception as e:
-        print(f"Error: {e} ")
