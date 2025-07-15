@@ -97,42 +97,51 @@ def translate(cause_csv, action_csv, cause_types_csv, combined_csv):
         elif frequency < 100:
             # Determine multiplication factor and 'max' rounds for initial diversity
             if frequency > 80:
-                factor = math.ceil( 600/ frequency)
-                max = 2
+                max = 1
+                factor = math.ceil( (600/ frequency)/max)
             elif frequency > 50:
-                factor = math.ceil( 500/ frequency)
                 max = 2
+                factor = math.ceil( (500/ frequency)/max)
             else:
-                factor = math.ceil(300/frequency)
                 max = 3
+                factor = math.ceil( (300/ frequency)/max)
 
-            # Get original sentences for the current cause
-            # Assumes 'Cause' column in df_c aligns with 'Action' in df_a by index
-            indexes = df_c.index[df_c['Cause'] == cause].tolist()
-            sentences = df_a.loc[indexes, 'Action'].tolist()
-            if len(sentences) == 0:
-                continue # Skip if no sentences found for this cause
+        # So we need: (target_multiplier / (1 + max)) - 1 rounds of translating augmented
+        phase1_multiplier = 1 + max
+        if factor <= phase1_multiplier:
+            # We already have enough after phase 1
+            phase2_rounds = 0
+        else:
+            # Calculate how many times we need to multiply the augmented set
+            phase2_multiplier = math.ceil(factor / phase1_multiplier)
+            phase2_rounds = phase2_multiplier - 1
 
-            augmented = sentences.copy() # Start with original sentences for initial augmentation
+        # Get original sentences for the current cause
+        indexes = df_c.index[df_c['Cause'] == cause].tolist()
+        sentences = df_a.loc[indexes, 'Action'].tolist()
+        if len(sentences) == 0:
+            print(f"No sentences found for cause: {cause}")
+            count += 1
+            continue # Skip if no sentences found for this cause
 
-            # First loop: Augment by repeatedly translating the *growing* 'augmented' list itself
-            # This helps increase diversity by translating already augmented sentences.
-            for _ in range(0, max):
-                augmented.extend(batch_translator(augmented))
-                # Note: 'i' variable is incremented but not used in the subsequent loop's range start 'i'
-                # as 'i' will always equal 'max' after this loop finishes.
-                # The 'max' number of passes results in original_count * (2^max) rough total.
+        augmented = sentences.copy() # Start with original sentences for initial augmentation
 
+        # First phase: Build diversity by translating ORIGINAL sentences multiple times
+        # This creates: original + (max rounds of back-translated originals)
+        for round_num in range(max):
+            print(f"Building diversity for '{cause}' - round {round_num+1}/{max}")
+            augmented.extend(batch_translator(sentences))  # Always translate originals
 
-            mod_sentences = augmented.copy() # Start 'mod_sentences' with the diverse 'augmented' set
-            
-            # Second loop: Further augment based on 'factor' using the diverse 'augmented' set
-            # This loop runs (factor - 1 - max) times.
-            # Total sentences will be current_len(augmented) + current_len(augmented) * (factor - 1 - max)
-            for _ in range(max, factor): # Corrected range to start from 'max' (as 'i' would be 'max')
-                mod_sentences.extend(batch_translator(augmented))
+        print(f"After phase 1: {len(sentences)} -> {len(augmented)} sentences")
 
-
+        mod_sentences = augmented.copy() # Start 'mod_sentences' with the diverse 'augmented' set
+        
+        # Second phase: Scale up by back-translating the entire augmented set
+        for round_num in range(phase2_rounds):
+            print(f"Scaling up '{cause}' - round {round_num+1}/{phase2_rounds}")
+            mod_sentences.extend(batch_translator(augmented))
+        
+        print(f"Final augmented '{cause}': {len(sentences)} -> {len(mod_sentences)} sentences")
         # Append the (original + augmented) sentences for the current cause to the combined CSV
         # Data is saved per category for robust recovery in case of interruption.
         append_sentences_to_csv(mod_sentences, cause, combined_csv )

@@ -1,7 +1,7 @@
 import pandas as pd
 from excel import extract_column_to_csv, insert_column_to_excel
 from cleaner import clean_csv
-#from translator import back_translator
+from translator import translate
 
 
 excel_file = "data/Trip Data for Matthew.xlsx"
@@ -19,7 +19,7 @@ def main (excel_file, sheet_name, column_name):
     #TODO: Get rid of the whitespace and make the first letter of each word capital 
     [cleaned_csv, rows_to_drop] = clean_csv("data/Trip_Causes_Uncleaned.csv", "data/Action_data.csv")
 
-
+    translate(cleaned_csv, "data/Action_data.csv", "data/Cause_types.csv", "data/combined_data.csv")
 
     #TODO: save back into the excel file to visulaise the data
     insert_column_to_excel(cleaned_csv,excel_file, rows_to_drop)
