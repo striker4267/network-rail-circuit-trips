@@ -1,5 +1,6 @@
 from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+import inspect
 
 def train(train_dataset, val_dataset, test_dataset, MODEL_NAME, num_labels, label2id, id2label):
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -9,12 +10,14 @@ def train(train_dataset, val_dataset, test_dataset, MODEL_NAME, num_labels, labe
         label2id = label2id      
     )
 
+    print("TrainingArguments is being imported from:", inspect.getfile(TrainingArguments))
+    
     training_args = TrainingArguments(
         output_dir='./results',              # Where to save the model
         num_train_epochs=3,                  # Train for 3 full passes over the data
         per_device_train_batch_size=16,      # Use batches of 16 for training
         per_device_eval_batch_size=64,       # Use batches of 64 for evaluation
-        evaluation_strategy="epoch",         # Run evaluation at the end of each epoch
+        eval_strategy="epoch",         # Run evaluation at the end of each epoch
         save_strategy="epoch",               # Save a checkpoint at the end of each epoch
         load_best_model_at_end=True,         # Automatically load the best model when training is done
         logging_steps=10,                    # How often to log training loss

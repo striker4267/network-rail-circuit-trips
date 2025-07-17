@@ -4,7 +4,8 @@ from train_model import train
 
 def main():
 
-    print("Preparing data")
+    
+
     combined_csv_file_path = "data/combined_data.csv"
     MODEL_NAME = "distilbert-base-uncased"
 

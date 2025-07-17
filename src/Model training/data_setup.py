@@ -3,6 +3,7 @@ import torch
 from sklearn.model_selection import train_test_split
 
 def prepare(csv_file_path):
+    print("Preparing data")
     column_names = ["Cause", "Action"]
     df = pd.read_csv(csv_file_path, header = None, names= column_names)
     print(f"loaded {len(df)} records")
